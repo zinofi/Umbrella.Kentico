@@ -7,6 +7,7 @@ using CMS.Membership;
 using Microsoft.Extensions.Logging;
 using Microsoft.Owin;
 using Umbrella.Kentico.Utilities.ContactManagement.Abstractions;
+using Umbrella.Kentico.Utilities.ContactManagement.Options;
 using Umbrella.Kentico.Utilities.Users.Abstractions;
 using Umbrella.Utilities;
 using Umbrella.Utilities.Extensions;
@@ -16,7 +17,8 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 	public class KenticoContactManager : IKenticoContactManager
 	{
 		private readonly ILogger _log;
-		private readonly IKenticoUserNameNormalizer _kenticoUserNameNormalizer;
+        private readonly KenticoContactManagerOptions _options;
+        private readonly IKenticoUserNameNormalizer _kenticoUserNameNormalizer;
 		private readonly Lazy<IContactProcessingChecker> _contactProcessingChecker;
 		private readonly Lazy<IContactCreator> _contactCreator;
 		private readonly Lazy<IContactRelationAssigner> _contactRelationAssigner;
@@ -25,6 +27,7 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 
 		public KenticoContactManager(
 			ILogger<KenticoContactManager> logger,
+            KenticoContactManagerOptions options,
 			IKenticoUserNameNormalizer kenticoUserNameNormalizer,
 			Lazy<IContactProcessingChecker> contactProcessingChecker,
 			Lazy<IContactCreator> contactCreator,
@@ -33,7 +36,8 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 			Lazy<IContactMergeService> contactMergeService)
 		{
 			_log = logger;
-			_kenticoUserNameNormalizer = kenticoUserNameNormalizer;
+            _options = options;
+            _kenticoUserNameNormalizer = kenticoUserNameNormalizer;
 			_contactProcessingChecker = contactProcessingChecker;
 			_contactCreator = contactCreator;
 			_contactRelationAssigner = contactRelationAssigner;
@@ -66,10 +70,12 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 				// Find the contact based on the current request. This is read from the CurrentContact cookie internally.
 				ContactInfo cookieContact = _contactPersistentStorage.Value.GetPersistentContact();
 
-				if (cookieContact == null)
-					throw new KenticoContactException("The contact loaded from the CurrentContact cookie should never be null here.");
+                // If a contact based on the CurrentContact cookie cannot be found, create a new anonymous one.
+                // Such a scenario may present itself if the cookie has been tampered with or the contact no longer exists in Kentico.
+                if (cookieContact == null)
+                    cookieContact = _contactCreator.Value.CreateAnonymousContact();
 
-				if (currentContact?.ContactEmail == cookieContact.ContactEmail)
+                if (currentContact?.ContactEmail == cookieContact.ContactEmail)
 				{
 					// The current user already has a contact and the one on the cookie is the same
 					// so we don't need to do anything else.
@@ -124,13 +130,12 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 
 			try
 			{
-				const string currentContactXsTrackerCookieName = "CurrentContactXsTracker";
 				string currentCookieValue = null;
 				List<string> lstCurrentlyMergedSites = null;
 
 				if (!reset)
 				{
-					currentCookieValue = owinContext.Request.Cookies[currentContactXsTrackerCookieName];
+					currentCookieValue = owinContext.Request.Cookies[_options.CrossSiteTrackingCookieName];
 
 					if (!string.IsNullOrWhiteSpace(currentCookieValue))
 					{
@@ -138,7 +143,7 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 						{
 							lstCurrentlyMergedSites = UmbrellaStatics.DeserializeJson<List<string>>(currentCookieValue);
 						}
-						catch (Exception exc) when (_log.WriteWarning(exc, new { currentCookieValue }, $"The cookie value of the {currentContactXsTrackerCookieName} could not be deserialized to a List<string> instance.", returnValue: true))
+						catch (Exception exc) when (_log.WriteWarning(exc, new { currentCookieValue }, $"The cookie value of the {_options.CrossSiteTrackingCookieName} could not be deserialized to a List<string> instance.", returnValue: true))
 						{
 							// If the cookie couldn't be deserialized it has probably been tampered with.
 						}
@@ -152,8 +157,10 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 				// or an existing list from the cookie when not resetting. Either way, the next steps are the same.
 				string currentSiteNameCleaned = currentSiteName.TrimToLowerInvariant();
 
-				if (!lstCurrentlyMergedSites.Contains(currentSiteNameCleaned))
-				{
+                // Even though the cookie may have already been processed, we need to force processing in the event that there isn't a CurrentContact cookie
+                // because it has been deleted manually or its value is invalid.
+                if (!lstCurrentlyMergedSites.Contains(currentSiteNameCleaned) || !CurrentContactExists(owinContext))
+                {
 					// We haven't merged the contact for this site yet.
 					Merge(owinContext.Request.User.Identity.Name);
 
@@ -167,7 +174,7 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 
 					// We only need to update the cookie if its value has actually changed
 					if (!string.Equals(currentCookieValue, updatedCookieValue, StringComparison.OrdinalIgnoreCase))
-						owinContext.Response.Cookies.Append(currentContactXsTrackerCookieName, updatedCookieValue, cookieOptionsBuilder());
+						owinContext.Response.Cookies.Append(_options.CrossSiteTrackingCookieName, updatedCookieValue, cookieOptionsBuilder());
 				}
 			}
 			catch (Exception exc) when (_log.WriteError(exc, new { owinContext.Request.User.Identity.Name, reset }, returnValue: true))
@@ -175,5 +182,15 @@ namespace Umbrella.Kentico.Utilities.ContactManagement
 				throw new KenticoContactException("There has been a problem merging the contact data for the specified user for the specified OwinContext.", exc);
 			}
 		}
-	}
+
+        private bool CurrentContactExists(IOwinContext owinContext)
+        {
+            // Only check the Kentico database if explicitly asked to.
+            if (_options.CheckCurrentContactWithPersistentStorageDuringValidation)
+                return _contactPersistentStorage.Value.GetPersistentContact() != null;
+
+            // Just confirm the presence of the cookie by default.
+            return !string.IsNullOrWhiteSpace(owinContext.Request.Cookies["CurrentContact"]);
+        }
+    }
 }
