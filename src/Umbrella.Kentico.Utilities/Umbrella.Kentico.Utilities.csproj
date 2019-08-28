@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
@@ -15,7 +15,7 @@
 
   <PropertyGroup>
     <PackageId>Umbrella.Kentico.Utilities</PackageId>
-    <Version>3.0.0-preview-001</Version>
+    <Version>3.0.0-preview-002</Version>
     <Authors>Richard Edwards</Authors>
     <Company>Zinofi Digital Ltd</Company>
     <Copyright>Zinofi Digital Ltd 2019</Copyright>
