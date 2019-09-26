@@ -15,8 +15,8 @@
 
   <PropertyGroup>
     <PackageId>Umbrella.Kentico.DataAccess</PackageId>
-    <Version>3.0.0-preview-002</Version>
-    <Authors>Richard Edwards</Authors>
+    <Version>3.0.0</Version>
+    <Authors>Zinofi Digital Ltd</Authors>
     <Company>Zinofi Digital Ltd</Company>
     <Copyright>Zinofi Digital Ltd 2019</Copyright>
     <Description>
