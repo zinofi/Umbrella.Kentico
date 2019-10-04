@@ -23,7 +23,7 @@
       This package contains Data Access infrastructure for working with Kentico Custom Tables.
     </Description>
     <PackageLicenseUrl>https://github.com/zinofi/Umbrella.Kentico/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageProjectUrl>https://github.com/zinofi/Umbrella</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/zinofi/Umbrella.Kentico</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>

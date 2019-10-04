@@ -23,7 +23,7 @@
       This package contains various utilities for use when developing with Kentico.
     </Description>
     <PackageLicenseUrl>https://github.com/zinofi/Umbrella.Kentico/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageProjectUrl>https://github.com/zinofi/Umbrella</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/zinofi/Umbrella.Kentico</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>
